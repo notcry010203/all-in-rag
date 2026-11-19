@@ -7,7 +7,24 @@
 ![文本分块示意图](./images/2_2_1.webp)
 
 ## 二、文本分块重要性
+```python
+chunks = text_splitter.split_documents(docs)
+chunks 的数据类型是 list[Document]，也就是由多个 LangChain Document 对象组成的列表
+chunks = [
+    Document(
+        page_content="蜂医是三角洲行动中的支援型干员。",
+        metadata={"source": "蜂医.md"}
+    ),
+    Document(
+        page_content="蜂医可以使用激素枪治疗队友。",
+        metadata={"source": "蜂医.md"}
+    )
+]
 
+
+chunks = splitter.split_text(text)
+这里的 chunks 是一个 list[str]，即字符串列表
+```
 ### 2.1 满足模型上下文限制
 
 将文本分块的首要原因，是为了适应 RAG 系统中两个核心组件的硬性限制：
