@@ -85,7 +85,7 @@ LangChain 提供了丰富且易于使用的文本分割器（Text Splitters）�
 
 chunk_size 不是严格上限，可能出现超长 Chunk。
 
-chunk_overlap 不保证精确重叠指定字符数，也可能没有重叠。
+chunk_overlap 不保证精确重叠指定字符数，也可能没有重叠。比如，如果上一个chunk的末尾片段也比规定的overlap字符大，那就没有overlap了，一个overlap片段都不保留
 
 只按照分隔符切分，不理解文本语义，可能破坏语义完整性。
 ```
