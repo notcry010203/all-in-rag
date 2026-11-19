@@ -332,6 +332,33 @@ docs = text_splitter.split_documents(documents)
 ```
 
 ### 3.4 基于文档结构的分块
+**个人理解**：
+```python
+核心思想：根据 Markdown 标题层级进行分块，同时将所属标题路径保存到 metadata 中，保留文档的结构信息。
+
+完整流程：
+
+定义标题规则：通过 headers_to_split_on 指定需要识别的标题层级，如 #、##。
+
+按标题分组：遍历 Markdown 文档，遇到指定标题时更新当前标题层级，将属于同一标题路径的连续内容聚合为 Chunk。
+
+生成元数据：每个 Chunk 保存对应的标题路径，例如 {"Header 1": "RAG基础", "Header 2": "Embedding"}。
+
+按需二次分块：如果 Chunk 过长，再使用 RecursiveCharacterTextSplitter.split_documents() 进行细分，生成的小块继承原有 metadata。
+
+特别注意：
+
+MarkdownHeaderTextSplitter 主要根据标题结构分块，不直接保证 Chunk 大小。
+
+默认 strip_headers=True，标题保存在 metadata 中，不保留在正文里。
+
+metadata 不一定自动参与向量化或传入 LLM，需要在后续流程中主动使用。
+
+适合标题层级清晰的 Markdown 文档；对于结构混乱的文档，效果可能较差。
+```
+
+
+
 
 对于具有明确结构标记的文档格式（如Markdown、HTML、LaTex），可以利用这些标记来实现更智能、更符合逻辑的分割。
 
