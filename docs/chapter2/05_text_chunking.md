@@ -61,6 +61,36 @@
 LangChain 提供了丰富且易于使用的文本分割器（Text Splitters），下面将介绍几种最核心的策略。
 
 ### 3.1 固定大小分块
+**个人理解**
+```python
+核心思想：先按指定分隔符切分，再将短片段合并为接近目标大小的 Chunk。
+
+完整流程：
+
+分割文本：按照指定分隔符（默认 \n\n）将文本拆成多个片段。
+
+合并片段：依次将相邻片段加入当前 Chunk。
+
+加入后不超过 chunk_size：继续合并。
+
+加入后超过 chunk_size：输出当前 Chunk，再处理新片段。
+
+处理重叠：输出 Chunk 后，从当前缓冲区头部逐步移除旧片段，尽量保留末尾不超过 chunk_overlap 的完整片段，并确保能容纳下一个片段。
+
+处理超长片段：如果单个片段已经超过 chunk_size，不会继续细分，而是保留这个超长片段。
+
+结束处理：遍历完成后，将缓冲区剩余内容输出为最后一个 Chunk。
+
+特别注意：
+
+chunk_size 不是严格上限，可能出现超长 Chunk。
+
+chunk_overlap 不保证精确重叠指定字符数，也可能没有重叠。
+
+只按照分隔符切分，不理解文本语义，可能破坏语义完整性。
+```
+
+
 
 这是最简单直接的分块方法。根据LangChain源码，这种方法的工作原理分为两个主要阶段：
 
@@ -104,6 +134,67 @@ for i, chunk in enumerate(chunks[:5]):
 
 ### 3.2 递归字符分块
 
+**个人理解**：
+```python
+核心思想：优先使用粗粒度分隔符，遇到超长片段则递归使用更细的分隔符，最后合并短片段。
+
+完整流程：
+
+选择分隔符：从分隔符列表中按优先级找到当前文本中第一个存在的分隔符，例如 ["\n\n", "\n", "。", "，", " ", ""]。
+
+分割并处理片段：按照选定的分隔符切分，逐个判断：
+
+片段小于 chunk_size：加入 _good_splits 暂存，等待合并。
+
+片段大于或等于 chunk_size：
+
+先通过 _merge_splits() 合并并输出之前暂存的短片段，清空暂存列表。
+
+如果还有更细的分隔符：递归调用 _split_text()，继续分割当前超长片段。
+
+如果没有更细的分隔符：直接保留该片段，可能产生超长 Chunk。
+
+递归返回：每一层递归都独立完成自己的分割与合并，得到的 Chunk 直接返回外层，外层不会重新合并这些 Chunk。
+
+处理重叠：每次 _merge_splits() 时，通过 chunk_overlap 尽量保留末尾的部分片段，规则与 CharacterTextSplitter 相同。
+
+结束处理：当前层遍历结束后，合并剩余的 _good_splits，返回该层的全部 Chunk。
+
+特别注意：
+
+默认包含 "" 字符级分隔符，因此通常可以将超长文本进一步切到大小限制以内。
+
+重叠只在各次合并过程中处理，不保证跨递归层或递归分支重叠。
+
+不同递归分支的结果不会再次统一合并，因此可能出现很短的 Chunk（例如之前的 12 字符块）。
+
+分隔符划分不等于语义划分，递归分块也无法保证语义完整性。
+
+for s in splits:
+    if len(s) < chunk_size:
+        _good_splits.append(s)
+
+    else:
+        if _good_splits:
+            final_chunks.extend(
+                _merge_splits(_good_splits)
+            )
+            _good_splits = []
+
+        # 对超长片段继续递归分割
+        recursively_split(s)
+
+# 当前层遍历结束后，合并剩余片段
+if _good_splits:
+    final_chunks.extend(
+        _merge_splits(_good_splits)
+    )
+
+有两个触发 _merge_splits() 的时机：
+1. 遇到单个长度大于或等于 chunk_size 的片段。
+2. 当前递归层的所有片段都遍历完毕。
+第二层：_merge_splits() 才判断累计长度,决定如何将短片段组合成最终 Chunk，并处理 chunk_overlap
+```
 在前面的章节中，已经尝试了使用 `RecursiveCharacterTextSplitter` 的默认配置来处理文档分块。现在让我们深入了解 `RecursiveCharacterTextSplitter` 的实现。这种分块器通过分隔符层级递归处理，相对与固定大小分块，改善了超长文本的处理效果。
 
 **算法流程**：
@@ -119,7 +210,7 @@ for i, chunk in enumerate(chunks[:5]):
 
 （3）**最终处理**: 将剩余的暂存片段合并成最后的块
 
-个人理解：
+
 
 **实现细节**：
 - **批处理机制**: 先收集所有合格片段（`_good_splits`），遇到超长片段时才触发合并操作。
